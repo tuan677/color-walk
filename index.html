@@ -132,6 +132,9 @@
             <button id="spin-btn" class="w-full max-w-xs bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5 active:translate-y-0 text-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
                 SPIN !
             </button>
+            <button id="instant-btn" class="w-full max-w-xs bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-3 mt-4 rounded-xl shadow transition-all active:translate-y-0 text-lg hidden">
+                Instant Results
+            </button>
             <button id="restart-btn" class="mt-4 text-slate-400 hover:text-slate-600 font-medium underline hidden">
                 Start Over
             </button>
@@ -169,6 +172,7 @@
                 allDoneSub: "Everyone has received their color.",
                 participant: "Participant",
                 playerPlace: "Enter name for Player",
+                instantBtn: "Instant Results",
                 colors: {
                     'Red': 'Red', 'Orange': 'Orange', 'Yellow': 'Yellow', 'Green': 'Green',
                     'Blue': 'Blue', 'Purple': 'Purple', 'Black': 'Black', 'White': 'White',
@@ -191,6 +195,7 @@
                 allDoneSub: "每個人都已經抽到顏色了。",
                 participant: "參加者",
                 playerPlace: "輸入玩家名稱",
+                instantBtn: "一鍵產生結果",
                 colors: {
                     'Red': '紅色', 'Orange': '橙色', 'Yellow': '黃色', 'Green': '綠色',
                     'Blue': '藍色', 'Purple': '紫色', 'Black': '黑色', 'White': '白色',
@@ -233,6 +238,7 @@
         const namesContainer = document.getElementById('names-container');
         const startBtn = document.getElementById('start-btn');
         const spinBtn = document.getElementById('spin-btn');
+        const instantBtn = document.getElementById('instant-btn');
         const restartBtn = document.getElementById('restart-btn');
         const turnIndicator = document.getElementById('turn-indicator');
         const turnSubtitle = document.getElementById('turn-subtitle');
@@ -247,6 +253,7 @@
             startBtn.innerText = i18n[currentLang].startBtn;
             document.getElementById('ui-results-title').innerText = i18n[currentLang].resultsTitle;
             restartBtn.innerText = i18n[currentLang].startOver;
+            instantBtn.innerText = i18n[currentLang].instantBtn;
             
             if (!isSpinning && currentPlayerIndex < participants.length) {
                 spinBtn.innerText = i18n[currentLang].spinBtn;
@@ -328,6 +335,7 @@
             gameScreen.classList.add('flex');
             restartBtn.classList.add('hidden');
             spinBtn.classList.remove('hidden');
+            instantBtn.classList.remove('hidden');
 
             updateGameUI();
             drawWheel();
@@ -399,6 +407,13 @@
 
         spinBtn.addEventListener('click', () => {
             if (isSpinning || currentPlayerIndex >= participants.length) return;
+            
+            // Skip animation if only 1 color is left
+            if (activeColors.length === 1) {
+                onSpinComplete(0);
+                return;
+            }
+
             isSpinning = true;
             spinBtn.disabled = true;
             spinBtn.innerText = i18n[currentLang].spinning;
@@ -452,6 +467,23 @@
             requestAnimationFrame(animate);
         });
 
+        instantBtn.addEventListener('click', () => {
+            if (isSpinning || currentPlayerIndex >= participants.length) return;
+            
+            // Instantly assign all remaining colors
+            while (currentPlayerIndex < participants.length) {
+                const winningIndex = Math.floor(Math.random() * activeColors.length);
+                participants[currentPlayerIndex].color = activeColors[winningIndex];
+                activeColors.splice(winningIndex, 1);
+                currentPlayerIndex++;
+            }
+            
+            currentRotation = currentRotation % 360;
+            updateGameUI();
+            drawWheel();
+            checkGameOver();
+        });
+
         function onSpinComplete(winningIndex) {
             const wonColor = activeColors[winningIndex];
             
@@ -471,12 +503,14 @@
             
             // Draw updated wheel
             drawWheel();
+            checkGameOver();
+        }
 
+        function checkGameOver() {
             if (currentPlayerIndex >= participants.length) {
                 // Game Over
-                turnIndicator.innerHTML = `<span class="text-emerald-500">${i18n[currentLang].allDone}</span>`;
-                turnSubtitle.innerText = i18n[currentLang].allDoneSub;
                 spinBtn.classList.add('hidden');
+                instantBtn.classList.add('hidden');
                 restartBtn.classList.remove('hidden');
                 shootConfetti();
             } else {
@@ -491,6 +525,10 @@
                 turnIndicator.innerText = `${participants[currentPlayerIndex].name}${i18n[currentLang].turnSuffix}`;
                 turnIndicator.className = "text-2xl font-bold text-blue-600 mb-1 transition-colors";
                 turnSubtitle.innerText = i18n[currentLang].colorsLeft(activeColors.length);
+            } else {
+                turnIndicator.innerHTML = `<span class="text-emerald-500">${i18n[currentLang].allDone}</span>`;
+                turnIndicator.className = "text-2xl font-bold mb-1 transition-colors";
+                turnSubtitle.innerText = i18n[currentLang].allDoneSub;
             }
 
             // Update Results List
