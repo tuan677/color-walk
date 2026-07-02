@@ -65,7 +65,8 @@
         }
     </style>
 </head>
-<body class="text-slate-800 antialiased p-3 sm:p-8 flex flex-col items-center justify-center min-h-screen relative">
+<!-- Added extra padding at bottom (pb-16) to prevent content overlapping with the footer credit -->
+<body class="text-slate-800 antialiased p-3 pb-16 sm:p-8 sm:pb-20 flex flex-col items-center justify-center min-h-screen relative">
 
     <!-- Language Toggle -->
     <div class="absolute top-4 right-4 sm:top-8 sm:right-8 z-50">
@@ -77,7 +78,7 @@
         </button>
     </div>
 
-    <div id="setup-screen" class="w-full max-w-lg bg-white rounded-2xl shadow-xl p-5 sm:p-10 transition-all duration-300">
+    <div id="setup-screen" class="w-full max-w-lg bg-white rounded-2xl shadow-xl p-5 sm:p-10 transition-all duration-300 z-10">
         <div class="text-center mb-8">
             <h1 id="ui-title" class="text-3xl font-extrabold text-slate-900 mb-2">Color Walk</h1>
             <p id="ui-subtitle" class="text-slate-500">Set up your participants to draw colors.</p>
@@ -117,7 +118,7 @@
         </button>
     </div>
 
-    <div id="game-screen" class="w-full max-w-5xl hidden flex-col lg:flex-row gap-4 lg:gap-8 items-start justify-center transition-all duration-300">
+    <div id="game-screen" class="w-full max-w-5xl hidden flex-col lg:flex-row gap-4 lg:gap-8 items-start justify-center transition-all duration-300 z-10">
         
         <!-- Left Column: The Wheel -->
         <div class="w-full lg:w-1/2 bg-white rounded-2xl shadow-xl p-5 sm:p-10 text-center flex flex-col items-center">
@@ -154,6 +155,13 @@
         </div>
     </div>
 
+    <!-- Credit Footer -->
+    <div class="absolute bottom-4 left-0 w-full text-center z-0">
+        <p id="credit-text" class="text-slate-400 text-xs sm:text-sm font-medium tracking-wide">
+            Created by tuan677
+        </p>
+    </div>
+
     <script>
         const i18n = {
             en: {
@@ -173,6 +181,7 @@
                 participant: "Participant",
                 playerPlace: "Enter name for Player",
                 instantBtn: "Instant Results",
+                credit: "Created by tuan677 © 2026",
                 colors: {
                     'Red': 'Red', 'Orange': 'Orange', 'Yellow': 'Yellow', 'Green': 'Green',
                     'Blue': 'Blue', 'Purple': 'Purple', 'Black': 'Black', 'White': 'White',
@@ -196,6 +205,7 @@
                 participant: "參加者",
                 playerPlace: "輸入玩家名稱",
                 instantBtn: "一鍵產生結果",
+                credit: "由 tuan677 製作 © 2026",
                 colors: {
                     'Red': '紅色', 'Orange': '橙色', 'Yellow': '黃色', 'Green': '綠色',
                     'Blue': '藍色', 'Purple': '紫色', 'Black': '黑色', 'White': '白色',
@@ -245,6 +255,7 @@
         const resultsList = document.getElementById('results-list');
         const langToggleBtn = document.getElementById('lang-toggle');
         const langText = document.getElementById('lang-text');
+        const creditText = document.getElementById('credit-text');
 
         function updateStaticText() {
             document.getElementById('ui-title').innerText = i18n[currentLang].title;
@@ -254,6 +265,7 @@
             document.getElementById('ui-results-title').innerText = i18n[currentLang].resultsTitle;
             restartBtn.innerText = i18n[currentLang].startOver;
             instantBtn.innerText = i18n[currentLang].instantBtn;
+            creditText.innerText = i18n[currentLang].credit; // Update credit text
             
             if (!isSpinning && currentPlayerIndex < participants.length) {
                 spinBtn.innerText = i18n[currentLang].spinBtn;
