@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Color Walk Wheel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%);
+            min-height: 100vh;
+        }
+        
+        .wheel-container {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            aspect-ratio: 1 / 1;
+            margin: 0 auto;
+            filter: drop-shadow(0 10px 15px rgba(0, 0, 0, 0.1));
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+        }
+
+        .needle {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 20px solid transparent;
+            border-right: 20px solid transparent;
+            border-top: 35px solid #334155;
+            z-index: 10;
+            filter: drop-shadow(0 4px 3px rgba(0, 0, 0, 0.2));
+        }
+
+        .color-swatch {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: inline-block;
+            border: 2px solid rgba(0,0,0,0.1);
+        }
+
+        /* Confetti animation styles */
+        .confetti {
+            position: fixed;
+            width: 10px;
+            height: 10px;
+            background-color: #f00;
+            z-index: 50;
+            animation: fall linear forwards;
+        }
+
+        @keyframes fall {
+            to { transform: translateY(100vh) rotate(720deg); }
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased p-3 sm:p-8 flex flex-col items-center justify-center min-h-screen">
+
+    <div id="setup-screen" class="w-full max-w-lg bg-white rounded-2xl shadow-xl p-5 sm:p-10 transition-all duration-300">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-extrabold text-slate-900 mb-2">Color Walk</h1>
+            <p class="text-slate-500">Set up your participants to draw colors.</p>
+        </div>
+
+        <div class="mb-6">
+            <label for="num-participants" class="block text-sm font-semibold text-slate-700 mb-2">
+                Number of Participants (1-10)
+            </label>
+            <input type="number" id="num-participants" min="1" max="10" value="4" 
+                class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-lg font-medium">
+        </div>
+
+        <div id="names-container" class="space-y-4 mb-8">
+            <!-- Name inputs will be injected here dynamically -->
+        </div>
+
+        <button id="start-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5 active:translate-y-0 text-lg">
+            Generate Wheel
+        </button>
+    </div>
+
+    <div id="game-screen" class="w-full max-w-5xl hidden flex-col lg:flex-row gap-4 lg:gap-8 items-start justify-center transition-all duration-300">
+        
+        <!-- Left Column: The Wheel -->
+        <div class="w-full lg:w-1/2 bg-white rounded-2xl shadow-xl p-5 sm:p-10 text-center flex flex-col items-center">
+            <h2 id="turn-indicator" class="text-2xl font-bold text-slate-900 mb-2">Player's Turn</h2>
+            <p id="turn-subtitle" class="text-slate-500 mb-8">Spin the wheel to get your color!</p>
+
+            <div class="wheel-container mb-8">
+                <div class="needle"></div>
+                <canvas id="wheel" width="500" height="500"></canvas>
+            </div>
+
+            <button id="spin-btn" class="w-full max-w-xs bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5 active:translate-y-0 text-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
+                SPIN !
+            </button>
+            <button id="restart-btn" class="mt-4 text-slate-400 hover:text-slate-600 font-medium underline hidden">
+                Start Over
+            </button>
+        </div>
+
+        <!-- Right Column: Results -->
+        <div class="w-full lg:w-1/2 bg-white rounded-2xl shadow-xl p-5 sm:p-10">
+            <h3 class="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                </svg>
+                Results Board
+            </h3>
+            <ul id="results-list" class="space-y-3">
+                <!-- Results will populate here -->
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Data Structure for the 10 allowed colors
+        const COLOR_PALETTE = [
+            { name: 'Red', hex: '#ef4444', text: '#ffffff' },
+            { name: 'Orange', hex: '#f97316', text: '#ffffff' },
+            { name: 'Yellow', hex: '#eab308', text: '#000000' },
+            { name: 'Green', hex: '#22c55e', text: '#ffffff' },
+            { name: 'Blue', hex: '#3b82f6', text: '#ffffff' },
+            { name: 'Purple', hex: '#a855f7', text: '#ffffff' },
+            { name: 'Black', hex: '#1f2937', text: '#ffffff' },
+            { name: 'White', hex: '#ffffff', text: '#000000' },
+            { name: 'Gray', hex: '#9ca3af', text: '#ffffff' },
+            { name: 'Pink', hex: '#ec4899', text: '#ffffff' }
+        ];
+
+        // State variables
+        let participants = [];
+        let activeColors = [];
+        let currentPlayerIndex = 0;
+        
+        // Wheel rendering and animation state
+        const canvas = document.getElementById('wheel');
+        const ctx = canvas.getContext('2d');
+        let currentRotation = 0; // in degrees
+        let isSpinning = false;
+
+        // UI Elements
+        const setupScreen = document.getElementById('setup-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const numParticipantsInput = document.getElementById('num-participants');
+        const namesContainer = document.getElementById('names-container');
+        const startBtn = document.getElementById('start-btn');
+        const spinBtn = document.getElementById('spin-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const turnIndicator = document.getElementById('turn-indicator');
+        const turnSubtitle = document.getElementById('turn-subtitle');
+        const resultsList = document.getElementById('results-list');
+
+        function generateNameInputs() {
+            let num = parseInt(numParticipantsInput.value);
+            if (isNaN(num) || num < 1) num = 1;
+            if (num > 10) num = 10;
+            numParticipantsInput.value = num;
+
+            // Preserve existing names if possible
+            const existingInputs = document.querySelectorAll('.participant-name');
+            const savedNames = Array.from(existingInputs).map(input => input.value);
+
+            namesContainer.innerHTML = '';
+            for (let i = 0; i < num; i++) {
+                const div = document.createElement('div');
+                const val = savedNames[i] !== undefined ? savedNames[i] : '';
+                div.innerHTML = `
+                    <label class="block text-xs font-medium text-slate-500 mb-1 uppercase tracking-wider">Participant ${i + 1}</label>
+                    <input type="text" class="participant-name w-full px-4 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="Enter name for Player ${i + 1}" value="${val}">
+                `;
+                namesContainer.appendChild(div);
+            }
+        }
+
+        // Initialize setup screen on load
+        numParticipantsInput.addEventListener('input', generateNameInputs);
+        generateNameInputs();
+
+        // Helper to shuffle an array (Fisher-Yates)
+        function shuffle(array) {
+            let currentIndex = array.length, randomIndex;
+            while (currentIndex != 0) {
+                randomIndex = Math.floor(Math.random() * currentIndex);
+                currentIndex--;
+                [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+            }
+            return array;
+        }
+
+        startBtn.addEventListener('click', () => {
+            const inputs = document.querySelectorAll('.participant-name');
+            participants = [];
+            
+            inputs.forEach((input, index) => {
+                const name = input.value.trim() || `Player ${index + 1}`;
+                participants.push({ name: name, color: null });
+            });
+
+            // Randomly select exactly N colors from the palette to be used
+            const shuffledPalette = shuffle([...COLOR_PALETTE]);
+            activeColors = shuffledPalette.slice(0, participants.length);
+
+            // Reset Game State
+            currentPlayerIndex = 0;
+            currentRotation = 0;
+            
+            // Switch screens
+            setupScreen.classList.add('hidden');
+            gameScreen.classList.remove('hidden');
+            gameScreen.classList.add('flex');
+            restartBtn.classList.add('hidden');
+            spinBtn.classList.remove('hidden');
+
+            updateGameUI();
+            drawWheel();
+        });
+
+        function drawWheel() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = Math.min(centerX, centerY) - 15; // padding
+
+            if (activeColors.length === 0) return;
+
+            const sliceAngleDeg = 360 / activeColors.length;
+            const sliceAngleRad = (Math.PI * 2) / activeColors.length;
+            const currentRotationRad = currentRotation * (Math.PI / 180);
+
+            for (let i = 0; i < activeColors.length; i++) {
+                const startAngle = currentRotationRad + i * sliceAngleRad;
+                const endAngle = startAngle + sliceAngleRad;
+
+                // Draw Slice
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+                ctx.closePath();
+                ctx.fillStyle = activeColors[i].hex;
+                ctx.fill();
+
+                // Draw Border (helpful for White/Light colors)
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = '#1e293b'; 
+                ctx.stroke();
+
+                // Draw Text
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                // Rotate to the center of the slice
+                ctx.rotate(startAngle + sliceAngleRad / 2);
+                
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = activeColors[i].text;
+                ctx.font = 'bold 24px Inter, sans-serif';
+                
+                // Add text shadow for better readability
+                if(activeColors[i].name === 'White' || activeColors[i].name === 'Yellow'){
+                    ctx.shadowColor = 'rgba(0,0,0,0.3)';
+                    ctx.shadowBlur = 4;
+                } else {
+                    ctx.shadowColor = 'rgba(255,255,255,0.3)';
+                    ctx.shadowBlur = 4;
+                }
+
+                ctx.fillText(activeColors[i].name, radius - 30, 0);
+                ctx.restore();
+            }
+
+            // Draw center dot
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 25, 0, Math.PI * 2);
+            ctx.fillStyle = '#1e293b';
+            ctx.fill();
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#fff';
+            ctx.stroke();
+        }
+
+        spinBtn.addEventListener('click', () => {
+            if (isSpinning || currentPlayerIndex >= participants.length) return;
+            isSpinning = true;
+            spinBtn.disabled = true;
+            spinBtn.innerText = 'Spinning...';
+
+            // Decide winning slice beforehand
+            const winningIndex = Math.floor(Math.random() * activeColors.length);
+            
+            // Calculate necessary rotation to make winning slice land at the top (270 degrees in canvas coords)
+            const sliceAngleDeg = 360 / activeColors.length;
+            const centerOfWinningSlice = winningIndex * sliceAngleDeg + (sliceAngleDeg / 2);
+            
+            // Standardizing top position (Top in HTML Canvas is technically -90 or 270 deg)
+            const targetTopAngle = 270;
+            
+            // Equation: (currentRotation + centerOfWinningSlice) % 360 === 270
+            let targetRotation = targetTopAngle - centerOfWinningSlice;
+            
+            // Add extra spins (e.g., 5-8 full rotations) for visual effect
+            const extraSpins = 6 + Math.random() * 3; 
+            targetRotation += 360 * Math.floor(extraSpins);
+
+            // Ensure we are spinning forward
+            if (targetRotation < currentRotation) {
+                targetRotation += 360 * Math.ceil((currentRotation - targetRotation) / 360);
+                targetRotation += 360 * 5; // ensure it spins enough
+            }
+
+            const startRotation = currentRotation;
+            const duration = 4500; // 4.5 seconds
+            const startTime = performance.now();
+
+            // Easing function (easeOutQuart)
+            const easeOut = t => 1 - Math.pow(1 - t, 4);
+
+            function animate(currentTime) {
+                const elapsed = currentTime - startTime;
+                let t = elapsed / duration;
+                if (t > 1) t = 1;
+
+                currentRotation = startRotation + (targetRotation - startRotation) * easeOut(t);
+                drawWheel();
+
+                if (t < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    isSpinning = false;
+                    onSpinComplete(winningIndex);
+                }
+            }
+
+            requestAnimationFrame(animate);
+        });
+
+        function onSpinComplete(winningIndex) {
+            const wonColor = activeColors[winningIndex];
+            
+            // Assign color to participant
+            participants[currentPlayerIndex].color = wonColor;
+            
+            // Remove color from pool
+            activeColors.splice(winningIndex, 1);
+            
+            // Advance turn
+            currentPlayerIndex++;
+            
+            // Keep wheel rotation normalized to avoid gigantic numbers
+            currentRotation = currentRotation % 360;
+
+            updateGameUI();
+            
+            // Draw updated wheel
+            drawWheel();
+
+            if (currentPlayerIndex >= participants.length) {
+                // Game Over
+                turnIndicator.innerHTML = '<span class="text-emerald-500">All Done!</span>';
+                turnSubtitle.innerText = 'Everyone has received their color.';
+                spinBtn.classList.add('hidden');
+                restartBtn.classList.remove('hidden');
+                shootConfetti();
+            } else {
+                spinBtn.disabled = false;
+                spinBtn.innerText = 'SPIN !';
+            }
+        }
+
+        function updateGameUI() {
+            // Update Turn indicator
+            if (currentPlayerIndex < participants.length) {
+                turnIndicator.innerText = `${participants[currentPlayerIndex].name}'s Turn`;
+                turnIndicator.className = "text-2xl font-bold text-blue-600 mb-1 transition-colors";
+                turnSubtitle.innerText = `Only ${activeColors.length} color${activeColors.length > 1 ? 's' : ''} left!`;
+            }
+
+            // Update Results List
+            resultsList.innerHTML = '';
+            participants.forEach((p, idx) => {
+                const li = document.createElement('li');
+                
+                // Active player gets a subtle pop effect
+                const isActive = idx === currentPlayerIndex;
+                li.className = `flex items-center justify-between p-4 rounded-xl transition-all duration-500 transform ${isActive ? 'scale-[1.02] shadow-lg ring-4 ring-blue-300 z-10 relative' : 'border'}`;
+                
+                if (p.color) {
+                    // Applied when player has received their color (Full background)
+                    li.style.backgroundColor = p.color.hex;
+                    li.style.color = p.color.text;
+                    li.style.borderColor = p.color.hex;
+                    li.style.boxShadow = `0 4px 14px 0 ${p.color.hex}50`; // Adds a subtle color glow
+                    
+                    li.innerHTML = `
+                        <div class="flex items-center gap-3 text-lg font-bold">
+                            <span>${p.name}</span>
+                        </div>
+                        <div class="flex items-center gap-2 font-black text-xl tracking-wider uppercase drop-shadow-sm">
+                            ${p.color.name}
+                        </div>
+                    `;
+                } else {
+                    // Applied when player is still waiting
+                    li.classList.add('bg-white', 'border-dashed', 'border-slate-300', 'text-slate-500');
+                    if (!isActive) li.classList.add('opacity-60');
+                    
+                    li.innerHTML = `
+                        <div class="flex items-center gap-3 text-lg font-medium">
+                            ${isActive ? '<span class="flex h-3 w-3 relative mr-1"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span><span class="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span></span>' : ''}
+                            <span>${p.name}</span>
+                        </div>
+                        <div class="text-sm italic opacity-70">
+                            Waiting...
+                        </div>
+                    `;
+                }
+
+                resultsList.appendChild(li);
+            });
+        }
+
+        restartBtn.addEventListener('click', () => {
+            gameScreen.classList.add('hidden');
+            gameScreen.classList.remove('flex');
+            setupScreen.classList.remove('hidden');
+            spinBtn.disabled = false;
+            spinBtn.innerText = 'SPIN !';
+        });
+
+        function shootConfetti() {
+            const colors = COLOR_PALETTE.map(c => c.hex);
+            for (let i = 0; i < 100; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                confetti.style.left = Math.random() * 100 + 'vw';
+                confetti.style.top = -10 + 'px';
+                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.animationDuration = (Math.random() * 3 + 2) + 's';
+                confetti.style.animationDelay = (Math.random() * 1) + 's';
+                document.body.appendChild(confetti);
+
+                // Cleanup
+                setTimeout(() => {
+                    confetti.remove();
+                }, 5000);
+            }
+        }
+    </script>
+</body>
+</html>
